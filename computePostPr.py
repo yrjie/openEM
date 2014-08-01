@@ -19,6 +19,11 @@ def zeroTest(x):
         x=eps
     return x
 
+def zeroLog(x):
+    if x<eps:
+        x=eps
+    return np.log(x)
+
 def inv_logit(p):
     t1=np.exp(p)
     return t1/(1+t1)
@@ -138,11 +143,87 @@ def genPostPr(infile, ecdfP, ecdfN):
 #     print '\t'.join([nowId,str(a/(a+b))])
     print '\t'.join([nowId, str(inv_logit(lratio))])
     
-	
 
-num1, ecdfP=genEcdf(posfile)
-num2, ecdfN=genEcdf(negfile)
+
+
+
+
+def genEcdf2(infile):
+    nowId=''
+    tagDistr=[[] for i in range(2)]
+    tagNum1=0
+    fi=open(infile)
+    for line in fi:
+        line=line.strip()
+        if len(line)<1:
+            continue
+        temp=line.split('\t')
+        fragLen=int(temp[8])
+        if fragLen<0:
+            fragLen=-fragLen
+        id='\t'.join([temp[0],temp[1],temp[2]])
+        if nowId=='':
+            nowId=id
+        if id != nowId:
+            tagDistr[1].append(tagNum1)
+            tagNum1=0
+            nowId=id
+        tagDistr[0].append(fragLen)
+        tagNum1+=1
+    fi.close()
+    tagDistr[1].append(tagNum1)
+    num=len(tagDistr[1])
+#     print num
+    retEcdf=[]
+    for x in tagDistr:
+#         print np.mean(x)
+        retEcdf.append(sm.distributions.ECDF(x))
+#     for i in range(len(tagDistr)):
+#         x=tagDistr[i]
+#         y=retEcdf[i]
+#         temp=y([min(x)+i*(max(x)-min(x))/10 for i in range(11)])-y([min(x)+i*(max(x)-min(x))/10 for i in range(-1,10)])
+#         print '\t'.join([str(m) for m in temp])
+    return num, retEcdf
+
+def genPostPr2(infile, ecdfP, ecdfN):
+    nowId=''
+    tagNum1=0
+    a=pi
+    b=1-pi
+    lratio=np.log(pi)-np.log(1-pi)
+    fi=open(infile)
+    for line in fi:
+        line=line.strip()
+        if len(line)<1:
+            continue
+        temp=line.split('\t')
+        fragLen=int(temp[8])
+        if fragLen<0:
+            fragLen=-fragLen
+        id='\t'.join([temp[0],temp[1],temp[2]])
+        if nowId=='':
+            nowId=id
+        if id != nowId and nowId != '':
+#             print '\t'.join([nowId,str(a/(a+b))])
+            lratio+=zeroLog(ecdfP[1](tagNum1)-ecdfP[1](tagNum1-10))
+            lratio-=zeroLog(ecdfN[1](tagNum1)-ecdfN[1](tagNum1-10))
+            print '\t'.join([nowId, str(inv_logit(lratio))])
+            tagNum1=0
+            lratio=np.log(pi)-np.log(1-pi)
+            nowId=id
+#         lratio+=zeroLog(ecdfP[0](fragLen)-ecdfP[0](fragLen-1))
+#         lratio-=zeroLog(ecdfN[0](fragLen)-ecdfN[0](fragLen-1))
+        tagNum1+=1
+    fi.close()
+    lratio+=zeroLog(ecdfP[1](tagNum1)-ecdfP[1](tagNum1-10))
+    lratio-=zeroLog(ecdfN[1](tagNum1)-ecdfN[1](tagNum1-10))
+#     print '\t'.join([nowId,str(a/(a+b))])
+    print '\t'.join([nowId, str(inv_logit(lratio))])
+
+
 pi=0.3
+num1, ecdfP=genEcdf2(posfile)
+num2, ecdfN=genEcdf2(negfile)
 # pi=1.0*num1/(num1+num2)
 # print pi
-postPr=genPostPr(testfile, ecdfP, ecdfN)
+postPr=genPostPr2(testfile, ecdfP, ecdfN)
