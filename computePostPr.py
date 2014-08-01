@@ -11,8 +11,17 @@ negfile=sys.argv[2]
 testfile=sys.argv[3]
 
 interval=[100, 180, 247, 315, 473, 558, 615, 1000000]
-eps=1e-8
+eps=1e-16
 pi=0.5
+
+def zeroTest(x):
+    if x<eps:
+        x=eps
+    return x
+
+def inv_logit(p):
+    t1=np.exp(p)
+    return t1/(1+t1)
 
 def genEcdf(infile):
     nowId=''
@@ -65,6 +74,7 @@ def genPostPr(infile, ecdfP, ecdfN):
     tagOne=[0]*(len(interval)+1)
     a=pi
     b=1-pi
+    lratio=np.log(pi)-np.log(1-pi)
     fi=open(infile)
     for line in fi:
     	line=line.strip()
@@ -85,17 +95,23 @@ def genPostPr(infile, ecdfP, ecdfN):
                 x=tagOne[i]
                 a*=ecdfP[i](x)-ecdfP[i](x-0.1)
                 b*=ecdfN[i](x)-ecdfN[i](x-0.1)
+                lratio+=np.log(zeroTest(ecdfP[i](x)-ecdfP[i](x-0.1)))
+                lratio-=np.log(zeroTest(ecdfN[i](x)-ecdfN[i](x-0.1)))
             x=tagOne[-1]
             a*=ecdfP[-1](x)-ecdfP[-1](x-10)
             b*=ecdfN[-1](x)-ecdfN[-1](x-10)
+            lratio+=np.log(zeroTest(ecdfP[-1](x)-ecdfP[-1](x-10)))
+            lratio-=np.log(zeroTest(ecdfN[-1](x)-ecdfN[-1](x-10)))
 #             print ecdfP[-1](x)-ecdfP[-1](x-1)
 #             print ecdfN[-1](x)-ecdfN[-1](x-1)
             if a+b<eps:
                 b=eps
-            print '\t'.join([nowId,str(a/(a+b))])
+#             print '\t'.join([nowId,str(a/(a+b))])
+            print '\t'.join([nowId, str(inv_logit(lratio))])
             tagOne=[0]*len(tagOne)
             a=pi
             b=1-pi
+            lratio=np.log(pi)-np.log(1-pi)
             nowId=id
         for i,x in enumerate(interval):
             if fragLen<x:
@@ -110,12 +126,17 @@ def genPostPr(infile, ecdfP, ecdfN):
         x=tagOne[i]
         a*=ecdfP[i](x)-ecdfP[i](x-0.1)
         b*=ecdfN[i](x)-ecdfN[i](x-0.1)
+        lratio+=np.log(zeroTest(ecdfP[i](x)-ecdfP[i](x-0.1)))
+        lratio-=np.log(zeroTest(ecdfN[i](x)-ecdfN[i](x-0.1)))
     x=tagOne[-1]
     a*=ecdfP[-1](x)-ecdfP[-1](x-10)
     b*=ecdfN[-1](x)-ecdfN[-1](x-10)
+    lratio+=np.log(zeroTest(ecdfP[-1](x)-ecdfP[-1](x-10)))
+    lratio-=np.log(zeroTest(ecdfN[-1](x)-ecdfN[-1](x-10)))
     if a+b<eps:
         b=eps
-    print '\t'.join([nowId,str(a/(a+b))])
+#     print '\t'.join([nowId,str(a/(a+b))])
+    print '\t'.join([nowId, str(inv_logit(lratio))])
     
 	
 
