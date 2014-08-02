@@ -10,7 +10,8 @@ posfile=sys.argv[1]
 negfile=sys.argv[2]
 testfile=sys.argv[3]
 
-interval=[100, 180, 247, 315, 473, 558, 615, 1000000]
+# interval=[100, 180, 247, 315, 473, 558, 615, 1000000]
+interval=[85, 164, 1000000]
 eps=1e-16
 pi=0.5
 
@@ -53,7 +54,7 @@ def genEcdf(infile):
     	    tagOne=[0]*len(tagOne)
     	    nowId=id
         for i,x in enumerate(interval):
-    	    if fragLen<x:
+    	    if fragLen<=x:
     	    	tagOne[i]+=1
     	    	break
         tagOne[-1]+=1
@@ -100,17 +101,17 @@ def genPostPr(infile, ecdfP, ecdfN):
                 x=tagOne[i]
                 a*=ecdfP[i](x)-ecdfP[i](x-0.1)
                 b*=ecdfN[i](x)-ecdfN[i](x-0.1)
-                lratio+=np.log(zeroTest(ecdfP[i](x)-ecdfP[i](x-0.1)))
-                lratio-=np.log(zeroTest(ecdfN[i](x)-ecdfN[i](x-0.1)))
+                lratio+=zeroLog(ecdfP[i](x)-ecdfP[i](x-0.1))
+                lratio-=zeroLog(ecdfN[i](x)-ecdfN[i](x-0.1))
             x=tagOne[-1]
             a*=ecdfP[-1](x)-ecdfP[-1](x-10)
             b*=ecdfN[-1](x)-ecdfN[-1](x-10)
-            lratio+=np.log(zeroTest(ecdfP[-1](x)-ecdfP[-1](x-10)))
-            lratio-=np.log(zeroTest(ecdfN[-1](x)-ecdfN[-1](x-10)))
+#             lratio+=zeroLog(ecdfP[-1](x)-ecdfP[-1](x-10))
+#             lratio-=zeroLog(ecdfN[-1](x)-ecdfN[-1](x-10))
 #             print ecdfP[-1](x)-ecdfP[-1](x-1)
 #             print ecdfN[-1](x)-ecdfN[-1](x-1)
-            if a+b<eps:
-                b=eps
+#             if a+b<eps:
+#                 b=eps
 #             print '\t'.join([nowId,str(a/(a+b))])
             print '\t'.join([nowId, str(inv_logit(lratio))])
             tagOne=[0]*len(tagOne)
@@ -131,15 +132,15 @@ def genPostPr(infile, ecdfP, ecdfN):
         x=tagOne[i]
         a*=ecdfP[i](x)-ecdfP[i](x-0.1)
         b*=ecdfN[i](x)-ecdfN[i](x-0.1)
-        lratio+=np.log(zeroTest(ecdfP[i](x)-ecdfP[i](x-0.1)))
-        lratio-=np.log(zeroTest(ecdfN[i](x)-ecdfN[i](x-0.1)))
+        lratio+=zeroLog(ecdfP[i](x)-ecdfP[i](x-0.1))
+        lratio-=zeroLog(ecdfN[i](x)-ecdfN[i](x-0.1))
     x=tagOne[-1]
     a*=ecdfP[-1](x)-ecdfP[-1](x-10)
     b*=ecdfN[-1](x)-ecdfN[-1](x-10)
-    lratio+=np.log(zeroTest(ecdfP[-1](x)-ecdfP[-1](x-10)))
-    lratio-=np.log(zeroTest(ecdfN[-1](x)-ecdfN[-1](x-10)))
-    if a+b<eps:
-        b=eps
+#     lratio+=zeroLog(ecdfP[-1](x)-ecdfP[-1](x-10))
+#     lratio-=zeroLog(ecdfN[-1](x)-ecdfN[-1](x-10))
+#     if a+b<eps:
+#         b=eps
 #     print '\t'.join([nowId,str(a/(a+b))])
     print '\t'.join([nowId, str(inv_logit(lratio))])
     
@@ -222,8 +223,9 @@ def genPostPr2(infile, ecdfP, ecdfN):
 
 
 pi=0.3
-num1, ecdfP=genEcdf2(posfile)
-num2, ecdfN=genEcdf2(negfile)
+num1, ecdfP=genEcdf(posfile)
+num2, ecdfN=genEcdf(negfile)
+postPr=genPostPr(testfile, ecdfP, ecdfN)
 # pi=1.0*num1/(num1+num2)
 # print pi
-postPr=genPostPr2(testfile, ecdfP, ecdfN)
+
