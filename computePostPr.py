@@ -4,14 +4,15 @@ import statsmodels.api as sm
 
 if len(sys.argv)<4:
     print 'Usage: pos_peakTag neg_peakTag allPeakTag'
+    print 'The 9th column should be the fragment length'
     exit(1)
 
 posfile=sys.argv[1]
 negfile=sys.argv[2]
 testfile=sys.argv[3]
 
-# interval=[100, 180, 247, 315, 473, 558, 615, 1000000]
-interval=[85, 164, 1000000]
+interval=[100, 180, 247, 315, 473, 558, 615, 1000000]
+# interval=[85, 164, 1000000]
 eps=1e-16
 pi=0.5
 
