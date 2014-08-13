@@ -1,6 +1,7 @@
 import sys,os
 import numpy as np
 import statsmodels.api as sm
+import scipy.optimize as op
 
 if len(sys.argv)<4:
     print 'Usage: pos_peakTag neg_peakTag allPeakTag'
@@ -11,8 +12,8 @@ posfile=sys.argv[1]
 negfile=sys.argv[2]
 testfile=sys.argv[3]
 
-interval=[100, 180, 247, 315, 473, 558, 615, 1000000]
-# interval=[85, 164, 1000000]
+# interval=[100, 180, 247, 315, 473, 558, 615, 1000000]
+interval=[85, 164, 1000000]
 eps=1e-16
 pi=0.5
 
@@ -29,6 +30,24 @@ def zeroLog(x):
 def inv_logit(p):
     t1=np.exp(p)
     return t1/(1+t1)
+
+def q_sum(x, data, Z, lam):
+    mu1=x[0]
+    sig1=x[1]
+    mu0=x[2]
+    sig0=x[3]
+    a=-sum(Z*scipy.log(ss.norm.pdf(data, loc=mu1, scale=sig1)*lam))
+    b=-sum((1-Z)*scipy.log(ss.norm.pdf(data, loc=mu0, scale=sig0)*(1-lam)))
+    ret=a+b
+    #ret=-sum(Z*scipy.log(ss.norm.pdf(data, loc=mu, scale=sig)*lam))
+    #print sum1,sum0
+    return ret
+
+def E_step(x1,x0,lam,data):
+    a1=scipy.log(ss.norm.pdf(data, loc=x1[0], scale=x1[1])*lam)
+    a0=scipy.log(ss.norm.pdf(data, loc=x0[0], scale=x0[1])*(1-lam))
+    lratio=a1-a0
+    return inv_logit(lratio)
 
 def genEcdf(infile):
     nowId=''
@@ -107,8 +126,8 @@ def genPostPr(infile, ecdfP, ecdfN):
             x=tagOne[-1]
             a*=ecdfP[-1](x)-ecdfP[-1](x-10)
             b*=ecdfN[-1](x)-ecdfN[-1](x-10)
-#             lratio+=zeroLog(ecdfP[-1](x)-ecdfP[-1](x-10))
-#             lratio-=zeroLog(ecdfN[-1](x)-ecdfN[-1](x-10))
+            lratio+=zeroLog(ecdfP[-1](x)-ecdfP[-1](x-10))
+            lratio-=zeroLog(ecdfN[-1](x)-ecdfN[-1](x-10))
 #             print ecdfP[-1](x)-ecdfP[-1](x-1)
 #             print ecdfN[-1](x)-ecdfN[-1](x-1)
 #             if a+b<eps:
@@ -138,8 +157,8 @@ def genPostPr(infile, ecdfP, ecdfN):
     x=tagOne[-1]
     a*=ecdfP[-1](x)-ecdfP[-1](x-10)
     b*=ecdfN[-1](x)-ecdfN[-1](x-10)
-#     lratio+=zeroLog(ecdfP[-1](x)-ecdfP[-1](x-10))
-#     lratio-=zeroLog(ecdfN[-1](x)-ecdfN[-1](x-10))
+    lratio+=zeroLog(ecdfP[-1](x)-ecdfP[-1](x-10))
+    lratio-=zeroLog(ecdfN[-1](x)-ecdfN[-1](x-10))
 #     if a+b<eps:
 #         b=eps
 #     print '\t'.join([nowId,str(a/(a+b))])
@@ -224,9 +243,10 @@ def genPostPr2(infile, ecdfP, ecdfN):
 
 
 pi=0.3
-num1, ecdfP=genEcdf(posfile)
-num2, ecdfN=genEcdf(negfile)
-postPr=genPostPr(testfile, ecdfP, ecdfN)
-# pi=1.0*num1/(num1+num2)
-# print pi
+# num1, ecdfP=genEcdf(posfile)
+# num2, ecdfN=genEcdf(negfile)
+# postPr=genPostPr(testfile, ecdfP, ecdfN)
 
+num1, ecdfP=genEcdf2(posfile)
+num2, ecdfN=genEcdf2(negfile)
+postPr=genPostPr2(testfile, ecdfP, ecdfN)

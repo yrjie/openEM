@@ -1,8 +1,9 @@
 import sys,os
 import numpy as np
+import statsmodels.api as sm
 
 if len(sys.argv)<4:
-    print 'Usage: pos_peakTag neg_peakTag allPeakTag'
+    print 'Usage: pos_peakTag neg_peakTag allPeakTag [binN]'
     print 'The 9th column should be the fragment length'
     exit(1)
 
@@ -10,8 +11,15 @@ posfile=sys.argv[1]
 negfile=sys.argv[2]
 testfile=sys.argv[3]
 
-interval=[100, 180, 247, 315, 473, 558, 615, 1000000]
-# interval=[85, 164, 1000000]
+binN=3
+if len(sys.argv)>4:
+    binN=int(sys.argv[4])
+
+if binN==3:
+    interval=[85, 164, 1000000]
+else:
+    interval=[100, 180, 247, 315, 473, 558, 615, 1000000]
+    
 eps=1e-16
 pi=0.5
 
@@ -68,6 +76,7 @@ def genMultiNPr(infile):
     retPr=[]
     for i in range(len(interval)):
         retPr.append(np.mean(tagDistr[i]))
+    retPr.append(sm.distributions.ECDF(tagDistr[-1]))
 #         print np.mean(x)
 #         retEcdf.append(sm.distributions.ECDF(x))
 #     for i in range(len(tagDistr)):
@@ -102,12 +111,8 @@ def genPostPr(infile, prP, prN):
             for i in range(len(interval)):
                 lratio+=tagOne[i]*(zeroLog(prP[i])-zeroLog(prN[i]))
             x=tagOne[-1]
-#             lratio+=zeroLog(ecdfP[-1](x)-ecdfP[-1](x-10))
-#             lratio-=zeroLog(ecdfN[-1](x)-ecdfN[-1](x-10))
-#             print ecdfP[-1](x)-ecdfP[-1](x-1)
-#             print ecdfN[-1](x)-ecdfN[-1](x-1)
-#             if a+b<eps:
-#                 b=eps
+#             lratio+=zeroLog(prP[-1](x)-prP[-1](x-10))
+#             lratio-=zeroLog(prN[-1](x)-prN[-1](x-10))
 #             print '\t'.join([nowId,str(a/(a+b))])
             print '\t'.join([nowId, str(inv_logit(lratio))])
             tagOne=[0]*len(tagOne)
@@ -127,20 +132,17 @@ def genPostPr(infile, prP, prN):
     for i in range(len(interval)):
         lratio+=tagOne[i]*(zeroLog(prP[i])-zeroLog(prN[i]))
     x=tagOne[-1]
-#     lratio+=zeroLog(ecdfP[-1](x)-ecdfP[-1](x-10))
-#     lratio-=zeroLog(ecdfN[-1](x)-ecdfN[-1](x-10))
-#     if a+b<eps:
-#         b=eps
-#     print '\t'.join([nowId,str(a/(a+b))])
+#     lratio+=zeroLog(prP[-1](x)-prP[-1](x-10))
+#     lratio-=zeroLog(prN[-1](x)-prN[-1](x-10))
     print '\t'.join([nowId, str(inv_logit(lratio))])
     
 
 pi=0.3
 prP=genMultiNPr(posfile)
 prN=genMultiNPr(negfile)
-# print prP
-# print prN
-postPr=genPostPr(testfile, prP, prN)
+print prP
+print prN
+# genPostPr(testfile, prP, prN)
 # pi=1.0*num1/(num1+num2)
 # print pi
 
