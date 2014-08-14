@@ -29,8 +29,6 @@ class Peak:
         self.tagNum=tagNum
         self.sig=sig
 
-allFeat=[[] for i in range(len(interval)+1)]
-
 binN=int(sys.argv[2])
 
 debug=0
@@ -39,6 +37,7 @@ if len(sys.argv)>3:
 
 eps=1e-16
 epsEM=1e-3
+maxEM=1000
 
 def zeroLog(x):
     if x<eps:
@@ -136,16 +135,20 @@ def E_step(peakSet, intA, intB, edistrP, edistrN, th, pi):
 def M_step(allPeak):
     allZ=[x.z for x in allPeak]
     pi=sum(allZ)/len(allZ)
-    loZ=np.percentile(allZ, 40*pi)
-    hiZ=np.percentile(allZ, 100-40*(1-pi))
+#     print "maxZ: ", max(allZ)
+#     loZ=np.percentile(allZ, 40*pi)
+    loZ=np.percentile(allZ, 100*(1-pi))
+    hiZ=np.percentile(allZ, 100-80*pi)
+#     hiZ=0.5
+#     loZ=0.5
 #     print len(allPeak), hiZ, loZ
     posPk=[x for x in allPeak if x.z>hiZ-eps]
     negPk=[x for x in allPeak if x.z<loZ+eps]
-    smpSize=10000
-    if len(posPk)>smpSize*pi:
-        posPk=posPk[0:int(smpSize*pi)]
-    if len(negPk)>smpSize*(1-pi):
-        negPk=negPk[0:int(smpSize*(1-pi))]
+#     smpSize=10000
+#     if len(posPk)>smpSize*pi:
+#         posPk=posPk[0:int(smpSize*pi)]
+#     if len(negPk)>smpSize*(1-pi):
+#         negPk=negPk[0:int(smpSize*(1-pi))]
     if debug:
         print len(posPk), len(negPk)
     posTag=sum([x.tagNum for x in posPk])
@@ -206,8 +209,6 @@ def M_step(allPeak):
         
     edistrP=genDistr(posPk, th, intA, intB)
     edistrN=genDistr(negPk, th, intA, intB)
-#     printOut(edistrP, th)
-#     printOut(edistrN, th)
     
     return intA, intB, edistrP, edistrN, th, pi
 
@@ -232,6 +233,7 @@ def runEM():
     
     oldPi=pi=0.5
     oldZ=[x.z for x in allPeak]
+    iter=0
     while 1:
         intA, intB, edistrP, edistrN, th, pi = M_step(allPeak)
         # B region: (intA, intB]
@@ -239,14 +241,19 @@ def runEM():
         E_step(allPeak, intA, intB, edistrP, edistrN, th, pi)
         nowZ=[x.z for x in allPeak]
         diffZ=max([abs(nowZ[i]-oldZ[i]) for i in range(len(nowZ))])
+        iter+=1
         if debug:
             print diffZ, pi
-        if abs(oldPi-pi)<epsEM and diffZ<epsEM:
+        if (abs(oldPi-pi)<epsEM and diffZ<epsEM) or iter>maxEM:
             break
         oldA=intA
         oldB=intB
         oldPi=pi
         oldZ=nowZ
+    
+    if debug:
+        printOut(edistrP, th)
+        printOut(edistrN, th)
     
     if not debug:
         for x in allPeak:
