@@ -1,6 +1,7 @@
 import sys,os
 import numpy as np
 import statsmodels.api as sm
+import operator
 
 if len(sys.argv)<3:
     print 'Usage: allPeakTag binN [debug]'
@@ -137,18 +138,24 @@ def M_step(allPeak):
     pi=sum(allZ)/len(allZ)
 #     print "maxZ: ", max(allZ)
 #     loZ=np.percentile(allZ, 40*pi)
-    loZ=np.percentile(allZ, 100*(1-pi))
-    hiZ=np.percentile(allZ, 100-80*pi)
+#     loZ=np.percentile(allZ, 100*(1-pi))
+#     hiZ=np.percentile(allZ, 100-80*pi)
 #     hiZ=0.5
 #     loZ=0.5
 #     print len(allPeak), hiZ, loZ
-    posPk=[x for x in allPeak if x.z>hiZ-eps]
-    negPk=[x for x in allPeak if x.z<loZ+eps]
+#     posPk=[x for x in allPeak if x.z>hiZ-eps]
+#     negPk=[x for x in allPeak if x.z<loZ+eps]
 #     smpSize=10000
 #     if len(posPk)>smpSize*pi:
 #         posPk=posPk[0:int(smpSize*pi)]
 #     if len(negPk)>smpSize*(1-pi):
 #         negPk=negPk[0:int(smpSize*(1-pi))]
+    
+    num=len(allPeak)
+    allPeak.sort(key=operator.attrgetter('z'))
+    posPk=[allPeak[i] for i in range(int((1-pi)*num), num)]
+    negPk=[allPeak[i] for i in range(0,int((1-pi)*num))]
+    
     if debug:
         print len(posPk), len(negPk)
     posTag=sum([x.tagNum for x in posPk])
@@ -199,13 +206,13 @@ def M_step(allPeak):
 #     intB=164
     for x in allPeak:
         x.bRatio=1.0*sum(x.lenNum[intA-minB+1:intB-minB+1])/x.tagNum
-    allBratio=[x.bRatio for x in allPeak]
+    allBratio=[x.bRatio for x in allPeak].sort()
     for i in range(binN):
-        th[0][i]=np.percentile(allBratio,(i+1)*100.0/binN)
+        th[0][i]=allBratio[(i+1)*num/binN]
     
-    allTagnum=[x.tagNum for x in allPeak]
+    allTagnum=[x.tagNum for x in allPeak].sort()
     for i in range(binN):
-        th[1][i]=np.percentile(allTagnum,(i+1)*100.0/binN)
+        th[1][i]=allTagnum[(i+1)*num/binN]
         
     edistrP=genDistr(posPk, th, intA, intB)
     edistrN=genDistr(negPk, th, intA, intB)
@@ -215,21 +222,28 @@ def M_step(allPeak):
 def runEM():
     oldA=intA=minB
     oldB=intB=maxB
-    allTagNum=[x.tagNum for x in allPeak]
-    loTag=np.percentile(allTagNum,10)
-    hiTag=np.percentile(allTagNum,90)
-    
-    allSig=[x.sig for x in allPeak]
-    loSig=np.percentile(allSig,10)+eps
-    hiSig=np.percentile(allSig,90)-eps
+#     allTagNum=[x.tagNum for x in allPeak]
+#     loTag=np.percentile(allTagNum,10)
+#     hiTag=np.percentile(allTagNum,90)
+#     
+#     allSig=[x.sig for x in allPeak]
+#     loSig=np.percentile(allSig,10)+eps
+#     hiSig=np.percentile(allSig,90)-eps
 #     tmpPk=[x for x in allPeak if x.tagNum<=loTag]
-    tmpPk=[x for x in allPeak if x.sig<=loSig]
-    for x in tmpPk:
-        x.z=0
+#     tmpPk=[x for x in allPeak if x.sig<=loSig]
+#     for x in tmpPk:
+#         x.z=0
 #     tmpPk=[x for x in allPeak if x.tagNum>=hiTag]
-    tmpPk=[x for x in allPeak if x.sig>=hiSig]
-    for x in tmpPk:
-        x.z=1
+#     tmpPk=[x for x in allPeak if x.sig>=hiSig]
+#     for x in tmpPk:
+#         x.z=1
+    allPeak.sort(key=operator.attrgetter('sig'))
+    num=len(allPeak)
+    for i in range(0,num/10):
+        allPeak.z=0
+    
+    for i in range(num*9/10, num):
+        allPeak.z=1
     
     oldPi=pi=0.5
     oldZ=[x.z for x in allPeak]
