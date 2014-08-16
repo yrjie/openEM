@@ -2,20 +2,30 @@ import sys,os
 import numpy as np
 import statsmodels.api as sm
 import operator
+import copy
 
-if len(sys.argv)<3:
-    print 'Usage: allPeakTag binN [debug]'
+if len(sys.argv)<4:
+    print 'Usage: allPeakTag binN outfile [debug]'
     print 'The 9th column should be the fragment length'
     exit(1)
 
 minB=50
 maxB=200
 
-interval=[85, 164, 1000000]
-
 infile=sys.argv[1]
+binN=int(sys.argv[2])
+outfile=sys.argv[3]
+
+debug=0
+if len(sys.argv)>4:
+    debug=int(sys.argv[4])
+
+eps=1e-16
+epsEM=1e-3
+maxEM=1000
 allPeak=[]
 
+beta=1 # pseudo count
 
 class Peak:
     id=''
@@ -29,16 +39,6 @@ class Peak:
         self.lenNum=lenNum
         self.tagNum=tagNum
         self.sig=sig
-
-binN=int(sys.argv[2])
-
-debug=0
-if len(sys.argv)>3:
-    debug=int(sys.argv[3])
-
-eps=1e-16
-epsEM=1e-3
-maxEM=1000
 
 def zeroLog(x):
     if x<eps:
@@ -95,11 +95,32 @@ def readFile(infile, allPeak):
     if debug:
         print len(allPeak)
 
-def genDistr(peakSet, th, intA, intB):
+def genPscnt(peakSet, th):
     num=len(peakSet)
     allBratio=[x.bRatio for x in peakSet]
     allTagnum=[x.tagNum for x in peakSet]
     retPr=[[0]*binN for i in range(binN)]
+    for i in range(num):
+        for idx0, y in enumerate(th[0]):
+            if allBratio[i]<=y:
+                break
+        for idx1, y in enumerate(th[1]):
+            if allTagnum[i]<=y:
+                break
+        retPr[idx0][idx1]+=1
+    
+    numPs=beta*binN*binN
+    for i in range(binN):
+        for j in range(binN):
+            retPr[i][j]*=1.0*numPs/num
+    return retPr
+    
+def genDistr(peakSet, th, psCnt):
+    num=len(peakSet)
+    allBratio=[x.bRatio for x in peakSet]
+    allTagnum=[x.tagNum for x in peakSet]
+#     retPr=[[1]*binN for i in range(binN)]
+    retPr=copy.deepcopy(psCnt)
     for i in range(num):
         for idx0, y in enumerate(th[0]):
             if allBratio[i]<=y:
@@ -153,7 +174,7 @@ def M_step(allPeak):
     
     num=len(allPeak)
     allPeak.sort(key=operator.attrgetter('z'))
-    posPk=[allPeak[i] for i in range(int((1-pi)*num), num)]
+    posPk=[allPeak[i] for i in range(int(num-pi*num), num)]
     negPk=[allPeak[i] for i in range(0,int((1-pi)*num))]
     
     if debug:
@@ -206,16 +227,27 @@ def M_step(allPeak):
 #     intB=164
     for x in allPeak:
         x.bRatio=1.0*sum(x.lenNum[intA-minB+1:intB-minB+1])/x.tagNum
-    allBratio=[x.bRatio for x in allPeak].sort()
+    allBratio=[x.bRatio for x in allPeak]
+    allBratio.sort()
     for i in range(binN):
-        th[0][i]=allBratio[(i+1)*num/binN]
+        th[0][i]=allBratio[(i+1)*num/binN-1]
     
-    allTagnum=[x.tagNum for x in allPeak].sort()
+    allTagnum=[x.tagNum for x in allPeak]
+    allTagnum.sort()
+    miTag=min(allTagnum)
+    maTag=max(allTagnum)
     for i in range(binN):
-        th[1][i]=allTagnum[(i+1)*num/binN]
-        
-    edistrP=genDistr(posPk, th, intA, intB)
-    edistrN=genDistr(negPk, th, intA, intB)
+#         th[1][i]=allTagnum[(i+1)*num/binN-1]
+#         th[1][i]=miTag+(maTag-miTag)*i/(binN-1)
+        if i==binN-1:
+            th[1][i]=allTagnum[num-1]
+        else:
+            th[1][i]=allTagnum[num-num/(1<<(i+1))]
+    
+    psCnt=genPscnt(allPeak, th)
+#     print psCnt
+    edistrP=genDistr(posPk, th, psCnt)
+    edistrN=genDistr(negPk, th, psCnt)
     
     return intA, intB, edistrP, edistrN, th, pi
 
@@ -226,24 +258,24 @@ def runEM():
 #     loTag=np.percentile(allTagNum,10)
 #     hiTag=np.percentile(allTagNum,90)
 #     
-#     allSig=[x.sig for x in allPeak]
-#     loSig=np.percentile(allSig,10)+eps
-#     hiSig=np.percentile(allSig,90)-eps
+    allSig=[x.sig for x in allPeak]
+    loSig=np.percentile(allSig,10)+eps
+    hiSig=np.percentile(allSig,90)-eps
 #     tmpPk=[x for x in allPeak if x.tagNum<=loTag]
-#     tmpPk=[x for x in allPeak if x.sig<=loSig]
-#     for x in tmpPk:
-#         x.z=0
+    tmpPk=[x for x in allPeak if x.sig<=loSig]
+    for x in tmpPk:
+        x.z=0
 #     tmpPk=[x for x in allPeak if x.tagNum>=hiTag]
-#     tmpPk=[x for x in allPeak if x.sig>=hiSig]
-#     for x in tmpPk:
-#         x.z=1
-    allPeak.sort(key=operator.attrgetter('sig'))
+    tmpPk=[x for x in allPeak if x.sig>=hiSig]
+    for x in tmpPk:
+        x.z=1
     num=len(allPeak)
-    for i in range(0,num/10):
-        allPeak.z=0
-    
-    for i in range(num*9/10, num):
-        allPeak.z=1
+#     allPeak.sort(key=operator.attrgetter('sig'))
+#     for i in range(0,num/10):
+#         allPeak[i].z=0
+#     
+#     for i in range(num*9/10, num):
+#         allPeak[i].z=1
     
     oldPi=pi=0.5
     oldZ=[x.z for x in allPeak]
@@ -254,7 +286,7 @@ def runEM():
 #         print intA, intB, pi
         E_step(allPeak, intA, intB, edistrP, edistrN, th, pi)
         nowZ=[x.z for x in allPeak]
-        diffZ=max([abs(nowZ[i]-oldZ[i]) for i in range(len(nowZ))])
+        diffZ=np.sqrt(sum([(nowZ[i]-oldZ[i])*(nowZ[i]-oldZ[i]) for i in range(len(nowZ))])/num)
         iter+=1
         if debug:
             print diffZ, pi
@@ -266,20 +298,22 @@ def runEM():
         oldZ=nowZ
     
     if debug:
-        printOut(edistrP, th)
-        printOut(edistrN, th)
+        fo=open('pr_openEM.log', 'w')
+        printOut(fo, edistrP, th)
+        printOut(fo, edistrN, th)
+        fo.close()
     
-    if not debug:
-        for x in allPeak:
-            print '\t'.join([x.id, str(x.z)])
+    fo=open(outfile,'w')
+    for x in allPeak:
+        fo.write('\t'.join([x.id, str(x.z)])+'\n')
+    fo.close()
+
             
-def printOut(pr, th):
+def printOut(fo, pr, th):
     for x in pr:
-        print '\t'.join([str(y) for y in x])
-    print '\n'
+        fo.write('\t'.join([str(y) for y in x])+'\n\n')
     for x in th:
-        print '\t'.join([str(y) for y in x])
-    print '\n'
+        fo.write('\t'.join([str(y) for y in x])+'\n\n')
 
 # pi=0.3
 readFile(infile, allPeak)
