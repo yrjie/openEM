@@ -3,6 +3,7 @@ import numpy as np
 import statsmodels.api as sm
 import operator
 import copy
+import scipy.stats as ss
 
 if len(sys.argv)<4:
     print 'Usage: allPeakTag binN outfile [debug]'
@@ -99,20 +100,39 @@ def genPscnt(peakSet, th):
     num=len(peakSet)
     allBratio=[x.bRatio for x in peakSet]
     allTagnum=[x.tagNum for x in peakSet]
+    numBratio=[0]*binN
     retPr=[[0]*binN for i in range(binN)]
+    numPs=beta*binN*binN
+#     for i in range(num):
+#         for idx0, y in enumerate(th[0]):
+#             if allBratio[i]<=y:
+#                 break
+#         for idx1, y in enumerate(th[1]):
+#             if allTagnum[i]<=y:
+#                 break
+#         retPr[idx0][idx1]+=1
+#
+#     for i in range(binN):
+#         for j in range(binN):
+#             retPr[i][j]*=1.0*numPs/num
+    
+    tagPar=ss.expon.fit(allTagnum)
     for i in range(num):
         for idx0, y in enumerate(th[0]):
             if allBratio[i]<=y:
                 break
-        for idx1, y in enumerate(th[1]):
-            if allTagnum[i]<=y:
-                break
-        retPr[idx0][idx1]+=1
+        numBratio[idx0]+=1
     
-    numPs=beta*binN*binN
+    preTag=0
     for i in range(binN):
         for j in range(binN):
-            retPr[i][j]*=1.0*numPs/num
+            if j==0:
+                preTag=0
+            else:
+                preTag=th[1][j-1]
+            prTag=ss.expon.cdf(th[1][j], loc=tagPar[0]-1, scale=tagPar[1])-ss.expon.cdf(preTag, loc=tagPar[0]-1, scale=tagPar[1])
+            retPr[i][j]=1.0*numPs*prTag*numBratio[i]/num
+
     return retPr
     
 def genDistr(peakSet, th, psCnt):
@@ -311,9 +331,11 @@ def runEM():
             
 def printOut(fo, pr, th):
     for x in pr:
-        fo.write('\t'.join([str(y) for y in x])+'\n\n')
+        fo.write('\t'.join([str(y) for y in x])+'\n')
+    fo.write('\n')
     for x in th:
-        fo.write('\t'.join([str(y) for y in x])+'\n\n')
+        fo.write('\t'.join([str(y) for y in x])+'\n')
+    fo.write('\n')
 
 # pi=0.3
 readFile(infile, allPeak)
